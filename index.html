@@ -303,9 +303,12 @@ async function loadConfigFromDB() {
     if (row && row.config_json) {
       const saved = typeof row.config_json === 'string' ? JSON.parse(row.config_json) : row.config_json;
       config = saved;
-      // fill in any missing persons slots
-      while (config.persons.length < 3) config.persons.push({...DEFAULT_PERSONS[config.persons.length]});
     }
+    // Always ensure persons array exists and has 3 slots
+    if (!config.persons || !Array.isArray(config.persons)) {
+      config.persons = DEFAULT_PERSONS.map(p => ({...p}));
+    }
+    while (config.persons.length < 3) config.persons.push({...DEFAULT_PERSONS[config.persons.length]});
     applyColors();
     const hasData = config.persons.some(p => p.calId || p.icsUrl);
     if (!hasData) {
