@@ -573,13 +573,27 @@ function parseIcal(text, personIdx) {
 // =============================================
 //  FETCH
 // =============================================
-const PROXIES=[u=>`https://corsproxy.io/?${encodeURIComponent(u)}`,u=>`https://api.allorigins.win/raw?url=${encodeURIComponent(u)}`];
+const PROXIES=[
+  u=>`https://corsproxy.io/?url=${encodeURIComponent(u)}`,
+  u=>`https://api.allorigins.win/raw?url=${encodeURIComponent(u)}`,
+  u=>`https://thingproxy.freeboard.io/fetch/${u}`,
+  u=>`https://cors.eu.org/${u}`,
+];
 async function fetchWithProxy(url) {
-  try{const r=await fetch(url,{signal:AbortSignal.timeout(5000)});if(r.ok)return await r.text();}catch(_){}
-  for(const fn of PROXIES){try{const r=await fetch(fn(url),{signal:AbortSignal.timeout(8000)});if(r.ok)return await r.text();}catch(_){}}
-  throw new Error('Could not fetch .ics — make sure calendar is set to Public.');
+  // Always force https
+  url = url.replace(/^http:\/\//i,'https://').replace(/^webcal:\/\//i,'https://');
+  for(const fn of [u=>u, ...PROXIES]){
+    try{
+      const r=await fetch(fn(url),{signal:AbortSignal.timeout(9000)});
+      if(r.ok){
+        const text=await r.text();
+        if(text.includes('BEGIN:VCALENDAR')) return text;
+      }
+    }catch(_){}
+  }
+  throw new Error('Could not fetch .ics — make sure calendar is Public in Apple Calendar settings.');
 }
-async function fetchAppleIcs(p,idx){if(!p.icsUrl)return[];return parseIcal(await fetchWithProxy(p.icsUrl.trim().replace(/^webcal:\/\//i,'https://')),idx);}
+async function fetchAppleIcs(p,idx){if(!p.icsUrl)return[];return parseIcal(await fetchWithProxy(p.icsUrl.trim()),idx);}
 async function fetchGoogleEvents(p,idx,tMin,tMax){
   if(!p.calId||!config.apiKey)return[];
   const r=await fetch(`https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(p.calId)}/events?key=${config.apiKey}&timeMin=${tMin}&timeMax=${tMax}&singleEvents=true&orderBy=startTime&maxResults=250`);
